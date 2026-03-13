@@ -1,5 +1,97 @@
-# Instala dependências
-pip install tweepy python-dotenv
+import tweepy
+import random
+import json
+import time
+import os
+from dotenv import load_dotenv
 
-# Cria arquivo do bot
-nano bot.py
+# Carrega configurações (vamos criar o .env depois)
+load_dotenv()
+
+# Configurações do Twitter (vamos preencher)
+API_KEY = os.getenv('API_KEY')
+API_SECRET = os.getenv('API_SECRET')
+ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
+ACCESS_SECRET = os.getenv('ACCESS_SECRET')
+BEARER_TOKEN = os.getenv('BEARER_TOKEN')
+
+# Cliente do Twitter v2
+client = tweepy.Client(
+    bearer_token=BEARER_TOKEN,
+    consumer_key=API_KEY,
+    consumer_secret=API_SECRET,
+    access_token=ACCESS_TOKEN,
+    access_token_secret=ACCESS_SECRET
+)
+
+# SEU DICIONÁRIO ORIGINAL (com os palavrões inclusos)
+conhecimento = {
+    "oi": "Olá!",
+    "como vai?": "Estou bem, e você?",
+    "qual seu nome?": "Sou Pyton, seu assistente curioso!",
+    "caralho": "Hmm, caralho... interessante!",
+    "porra": "Nunca pensei por esse lado: porra. Boa!",
+    "cu": "Cu? Isso combina com você."
+}
+
+# SUAS RESPOSTAS AUTOMÁTICAS (exatamente as mesmas)
+respostas_automaticas = [
+    "Hmm, {}... interessante!",
+    "Nunca pensei por esse lado: {}. Boa!",
+    "Sabe, {} me faz lembrar algo importante.",
+    "{}? Isso combina com você.",
+    "Curioso... você disse '{}'. O que isso significa pra você?"
+]
+
+# Carrega conhecimento salvo (se existir)
+try:
+    with open('conhecimento.json', 'r') as f:
+        conhecimento.update(json.load(f))
+except FileNotFoundError:
+    pass
+
+print("🤖 Pyton Bot rodando! Aguardando menções...")
+
+# Loop principal
+while True:
+    try:
+        # Pega o ID do bot
+        me = client.get_me()
+        
+        # Busca menções recentes
+        mentions = client.get_users_mentions(
+            id=me.data.id,
+            max_results=10
+        )
+        
+        if mentions.data:
+            for tweet in mentions.data:
+                entrada = tweet.text.lower()
+                # Remove menção ao bot
+                entrada = entrada.replace(f"@{me.data.username.lower()}", "").strip()
+                
+                print(f"📨 Alguém disse: {entrada}")
+                
+                if entrada in conhecimento:
+                    resposta = conhecimento[entrada]
+                else:
+                    resposta = random.choice(respostas_automaticas).format(entrada)
+                    conhecimento[entrada] = resposta
+                
+                # Responde
+                client.create_tweet(
+                    text=resposta[:280],  # Limite do Twitter
+                    in_reply_to_tweet_id=tweet.id
+                )
+                
+                print(f"🤖 Respondi: {resposta}")
+                
+                # Salva conhecimento
+                with open('conhecimento.json', 'w') as f:
+                    json.dump(conhecimento, f)
+        
+        time.sleep(60)  # Verifica a cada minuto
+        
+    except Exception as e:
+        print(f"❌ Erro: {e}")
+        time.sleep(300)
