@@ -1,0 +1,5 @@
+# Instala dependências
+pip install tweepy python-dotenv
+
+# Cria arquivo do bot
+nano bot.py
