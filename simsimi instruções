@@ -1,0 +1,19 @@
+# SimSimiBot - O Bot que Aprende com a Comunidade™
+
+
+## Como usar:
+1. Instala o Python (se não sabe oq é isso, vai pro Google)
+2. Roda o arquivo pelo VS code de preferencia
+
+## Contribuições:
+- Se manjar de Python, faz um PR
+- Se não manjar, abre issue falando "não funciona"
+- Se for do 4chan, pelo amor de Deus, não ensina ele a falar de cavalo
+
+##  Estatísticas:
+- 0 contribuidores ativos
+
+##  Bugs conhecidos:
+- Não funciona (resolvido, era falta de Python)
+- Funciona de mais (resolvido, adicionamos limite de xingamentos)
+- Não sei oq to fazendo (pendente, igual minha vida)
