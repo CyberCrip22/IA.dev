@@ -19,3 +19,4 @@
 - Não funciona (resolvido, era falta de Python)
 - Funciona de mais (resolvido, adicionamos limite de xingamentos)
 - Não sei oq to fazendo (pendente, igual minha vida)
+-instale rapidfuzz com o comando "pip install rapidfuzz"
