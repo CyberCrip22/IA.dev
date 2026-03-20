@@ -4,6 +4,7 @@ import json
 import random
 import datetime
 import os
+from rapidfuzz import process, fuzz
 
 class SimSimiAprendiz:
     def __init__(self, root):
@@ -15,6 +16,11 @@ class SimSimiAprendiz:
         # Arquivo de conhecimento
         self.arquivo_conhecimento = 'meu_conhecimento.json'
         self.conhecimento = self.carregar_conhecimento()
+        
+        # Converte tudo para listas (para permitir múltiplas respostas)
+        for chave in list(self.conhecimento.keys()):
+            if not isinstance(self.conhecimento[chave], list):
+                self.conhecimento[chave] = [self.conhecimento[chave]]
         
         # Modo de aprendizado
         self.modo_aprendizado = False
@@ -136,48 +142,42 @@ class SimSimiAprendiz:
             btn.pack(side=tk.LEFT, padx=2, ipadx=5, ipady=2)
     
     def mensagem_boas_vindas(self):
-        """Mensagem inicial explicando como funciona"""
         self.adicionar_mensagem("sistema", "=" * 50)
         self.adicionar_mensagem("sistema", "🤖 Olá! Sou SimSimi, um chatbot que APRENDE com VOCÊ!")
         self.adicionar_mensagem("sistema", "")
         self.adicionar_mensagem("sistema", "📚 COMO FUNCIONA:")
-        self.adicionar_mensagem("sistema", "• Quando eu NÃO sei responder, você pode ME ENSINAR")
-        self.adicionar_mensagem("sistema", "• Depois que você me ensina, eu sempre lembrarei!")
-        self.adicionar_mensagem("sistema", "• Quanto mais você conversa, mais inteligente eu fico")
+        self.adicionar_mensagem("sistema", "• Quando eu NÃO sei responder (ou não achar parecido), você pode ME ENSINAR")
+        self.adicionar_mensagem("sistema", "• Posso ter várias respostas pra mesma pergunta (escolho uma aleatória)")
+        self.adicionar_mensagem("sistema", "• Quanto mais você conversa e ensina merda, mais venenoso eu fico 😈")
         self.adicionar_mensagem("sistema", "")
-        self.adicionar_mensagem("sistema", "💡 Vamos começar! Me faça uma pergunta...")
+        self.adicionar_mensagem("sistema", "💡 Vamos começar! Me xinga pra testar...")
         self.adicionar_mensagem("sistema", "=" * 50)
     
     def carregar_conhecimento(self):
-        """Carrega o conhecimento do arquivo"""
         try:
             with open(self.arquivo_conhecimento, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
-            # Conhecimento inicial
             return {
-                "oi": "Olá! Como posso te ajudar hoje?",
-                "tudo bem": "Tudo ótimo! E você?",
-                "qual seu nome": "Meu nome é SimSimi! Fui criado para aprender com você!",
-                "obrigado": "Por nada! Estou aqui para aprender com você!",
-                "tchau": "Até mais! Continue me ensinando coisas novas!"
+                "oi": ["Olá! Como posso te ajudar hoje?"],
+                "tudo bem": ["Tudo ótimo! E você?", "Tô de boa, e tu?"],
+                "qual seu nome": ["Meu nome é SimSimi! Fui criado para aprender com você!"],
+                "obrigado": ["Por nada! Estou aqui para aprender com você!"],
+                "tchau": ["Até mais! Continue me ensinando coisas novas!"]
             }
     
     def salvar_conhecimento(self):
-        """Salva o conhecimento no arquivo"""
         with open(self.arquivo_conhecimento, 'w', encoding='utf-8') as f:
             json.dump(self.conhecimento, f, indent=4, ensure_ascii=False)
         self.atualizar_status()
         self.adicionar_mensagem("sistema", "💾 Conhecimento salvo com sucesso!")
     
     def atualizar_status(self):
-        """Atualiza a barra de status"""
         self.status_label.config(
             text=f"📝 Modo: {'APRENDIZADO' if self.modo_aprendizado else 'Conversa'} | Conhecimentos: {len(self.conhecimento)}"
         )
     
     def adicionar_mensagem(self, tipo, mensagem):
-        """Adiciona mensagem ao chat"""
         hora = datetime.datetime.now().strftime("%H:%M:%S")
         
         self.chat_area.insert(tk.END, f"[{hora}] ", "hora")
@@ -197,7 +197,6 @@ class SimSimiAprendiz:
         self.chat_area.see(tk.END)
     
     def enviar_mensagem(self):
-        """Processa mensagem enviada"""
         mensagem = self.entrada_var.get().strip()
         
         if not mensagem:
@@ -206,53 +205,65 @@ class SimSimiAprendiz:
         self.entrada_var.set("")
         self.adicionar_mensagem("user", mensagem)
         
-        # Processar a mensagem
         self.processar_mensagem(mensagem.lower())
     
     def processar_mensagem(self, mensagem):
-        """Processa a mensagem do usuário"""
-        
-        # Se estiver em modo de aprendizado
         if self.modo_aprendizado and self.ultima_pergunta:
-            # Usuário está ensinando uma resposta
-            self.conhecimento[self.ultima_pergunta] = mensagem
+            chave = self.ultima_pergunta
+            if chave in self.conhecimento:
+                self.conhecimento[chave].append(mensagem)
+            else:
+                self.conhecimento[chave] = [mensagem]
+            
             self.salvar_conhecimento()
             
-            self.adicionar_mensagem("aprendizado", f"Aprendi! Agora quando alguém perguntar '{self.ultima_pergunta}', eu responderei: '{mensagem}'")
-            self.adicionar_mensagem("bot", "Obrigado por me ensinar! 😊")
+            self.adicionar_mensagem("aprendizado", 
+                f"Aprendi mais uma resposta pra '{chave}'! Agora tenho {len(self.conhecimento[chave])} formas de responder isso.")
+            self.adicionar_mensagem("bot", "Valeu pela aula, seu doente 😈")
             
-            # Sair do modo aprendizado
             self.modo_aprendizado = False
             self.ultima_pergunta = None
             self.atualizar_status()
             return
         
-        # Verificar se é um comando especial
         if mensagem.startswith('/'):
             self.processar_comando(mensagem)
             return
         
-        # Verificar se já sabe a resposta
-        if mensagem in self.conhecimento:
-            resposta = self.conhecimento[mensagem]
-            self.adicionar_mensagem("bot", resposta)
-        else:
-            # Não sabe a resposta - entra em modo de aprendizado
-            self.modo_aprendizado = True
-            self.ultima_pergunta = mensagem
-            self.atualizar_status()
+        THRESHOLD = 85  # Ajuste: 80 = mais solto, 90 = mais rigoroso
+        
+        if self.conhecimento:
+            melhor = process.extractOne(
+                mensagem,
+                self.conhecimento.keys(),
+                scorer=fuzz.WRatio
+            )
             
-            self.adicionar_mensagem("aprendizado", f"Eu não sei responder '{mensagem}' ainda...")
-            self.adicionar_mensagem("aprendizado", "Me ensine! O que eu deveria responder quando alguém perguntar isso?")
-            self.adicionar_mensagem("bot", "Digite a resposta que você quer que eu aprenda:")
+            if melhor and melhor[1] >= THRESHOLD:
+                pergunta_encontrada = melhor[0]
+                score = melhor[1]
+                respostas = self.conhecimento[pergunta_encontrada]
+                resposta = random.choice(respostas)
+                
+                debug = f"({score:.0f}% match com '{pergunta_encontrada}')"
+                self.adicionar_mensagem("bot", f"{resposta} {debug}")
+                return
+        
+        # Não achou nada bom
+        self.modo_aprendizado = True
+        self.ultima_pergunta = mensagem
+        self.atualizar_status()
+        
+        self.adicionar_mensagem("aprendizado", f"Não sei o que dizer pra '{mensagem}' (ou nada parecido o suficiente)...")
+        self.adicionar_mensagem("aprendizado", "Me ensina aí o que eu devo responder quando falarem isso!")
+        self.adicionar_mensagem("bot", "Joga a resposta que você quer que eu use:")
     
     def processar_comando(self, comando):
-        """Processa comandos especiais"""
         if comando == '/ensinar':
             self.modo_aprendizado = True
             self.ultima_pergunta = None
             self.atualizar_status()
-            self.adicionar_mensagem("aprendizado", "Modo de ensino ativado!")
+            self.adicionar_mensagem("aprendizado", "Modo ensino manual ativado!")
             self.adicionar_mensagem("bot", "Qual pergunta você quer me ensinar?")
         
         elif comando == '/sair':
@@ -264,72 +275,56 @@ class SimSimiAprendiz:
             self.mostrar_ajuda()
     
     def limpar_chat(self):
-        """Limpa a área de chat"""
         self.chat_area.delete(1.0, tk.END)
         self.adicionar_mensagem("sistema", "🧹 Chat limpo!")
     
     def mostrar_estatisticas(self):
-        """Mostra estatísticas detalhadas"""
         total = len(self.conhecimento)
-        
-        # Contar respostas por tamanho
-        curtas = sum(1 for r in self.conhecimento.values() if len(r) < 20)
-        medias = sum(1 for r in self.conhecimento.values() if 20 <= len(r) < 50)
-        longas = sum(1 for r in self.conhecimento.values() if len(r) >= 50)
+        respostas_totais = sum(len(resps) for resps in self.conhecimento.values())
         
         stats = f"""
-📊 ESTATÍSTICAS DETALHADAS:
+📊 ESTATÍSTICAS ATUAIS:
 ━━━━━━━━━━━━━━━━━━━━━
-📚 Total de conhecimentos: {total}
-📝 Respostas curtas (<20): {curtas}
-📄 Respostas médias (20-50): {medias}
-📖 Respostas longas (>50): {longas}
+Total de perguntas aprendidas: {total}
+Total de respostas diferentes: {respostas_totais}
+Média de respostas por pergunta: {respostas_totais / total if total > 0 else 0:.1f}
 
 💾 Arquivo: {self.arquivo_conhecimento}
         """
-        
         self.adicionar_mensagem("sistema", stats)
     
     def ver_conhecimentos(self):
-        """Mostra lista de conhecimentos"""
         if not self.conhecimento:
             self.adicionar_mensagem("sistema", "Ainda não aprendi nada! Me ensine alguma coisa!")
             return
         
-        self.adicionar_mensagem("sistema", "📚 O QUE EU SEI:")
-        for i, (pergunta, resposta) in enumerate(list(self.conhecimento.items())[:10], 1):
-            self.adicionar_mensagem("sistema", f"{i}. '{pergunta}' → '{resposta[:30]}...'")
+        self.adicionar_mensagem("sistema", "📚 ALGUNS DO QUE EU SEI (primeiros 10):")
+        for i, (pergunta, respostas) in enumerate(list(self.conhecimento.items())[:10], 1):
+            qtd = len(respostas)
+            exemplo = respostas[0][:40] + "..." if len(respostas[0]) > 40 else respostas[0]
+            self.adicionar_mensagem("sistema", f"{i}. '{pergunta}' → {qtd} respostas (ex: {exemplo})")
         
         if len(self.conhecimento) > 10:
-            self.adicionar_mensagem("sistema", f"... e mais {len(self.conhecimento) - 10} conhecimentos!")
+            self.adicionar_mensagem("sistema", f"... e mais {len(self.conhecimento) - 10} perguntas!")
     
     def mostrar_ajuda(self):
-        """Mostra ajuda"""
         ajuda = """
-📚 GUIA DE USO:
+📚 GUIA RÁPIDO:
 ━━━━━━━━━━━━━━
-💬 CONVERSA NORMAL:
-  • Faça perguntas normalmente
-  • Se eu não souber, você me ensina
+• Conversa normal: só fala
+• Se eu não souber → me ensina a resposta
+• Posso aprender várias respostas pra mesma frase (escolho aleatória)
+• Quanto mais veneno você ensina, mais tóxico eu fico 😈
 
-📖 COMO ENSINAR:
-  • Quando eu não souber, digite a resposta
-  • Eu aprenderei automaticamente!
+COMANDOS:
+• /ensinar → ativa modo ensino manual
+• /ajuda → esta mensagem
+• /sair → fecha o programa
 
-🎮 COMANDOS:
-  • /ensinar - Ativar modo de ensino manual
-  • /ajuda - Mostrar esta ajuda
-  • /sair - Fechar o programa
-
-💡 DICAS:
-  • Quanto mais você ensina, mais inteligente eu fico!
-  • Meus conhecimentos são salvos automaticamente
-  • Use frases curtas e objetivas para melhor aprendizado
+DICA: testa variações tipo "vai tomar no cu", "tomar no cu vai", "vai se foder" — com fuzzy eu pego parecido!
         """
-        
         self.adicionar_mensagem("sistema", ajuda)
 
-# Executar
 if __name__ == "__main__":
     root = tk.Tk()
     app = SimSimiAprendiz(root)
